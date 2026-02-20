@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Immeuble Connect</title>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:#eef1f5;
+}
+header{
+    background:#1877f2;
+    color:white;
+    padding:15px;
+    text-align:center;
+    font-size:20px;
+    font-weight:bold;
+}
+.container{
+    padding:15px;
+}
+input, textarea{
+    width:100%;
+    padding:10px;
+    margin:5px 0;
+    border-radius:8px;
+    border:1px solid #ccc;
+}
+button{
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    margin-top:5px;
+}
+.primary{
+    background:#1877f2;
+    color:white;
+}
+.danger{
+    background:red;
+    color:white;
+}
+.card{
+    background:white;
+    padding:10px;
+    margin-top:10px;
+    border-radius:10px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+.hidden{ display:none; }
+.profile-pic{
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    object-fit:cover;
+}
+nav button{
+    width:32%;
+    background:#ddd;
+}
+nav{
+    display:flex;
+    justify-content:space-between;
+    margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<header>🏠 Immeuble Connect</header>
+
+<div class="container">
+
+<div id="auth">
+<h3>Inscription</h3>
+<input type="text" id="regUser" placeholder="Nom">
+<input type="password" id="regPass" placeholder="Mot de passe">
+<input type="text" id="regCode" placeholder="Code secret immeuble">
+<input type="file" id="regPhoto">
+<button class="primary" onclick="register()">S'inscrire</button>
+
+<h3>Connexion</h3>
+<input type="text" id="logUser" placeholder="Nom">
+<input type="password" id="logPass" placeholder="Mot de passe">
+<button class="primary" onclick="login()">Se connecter</button>
+</div>
+
+<div id="app" class="hidden">
+
+<button class="danger" onclick="logout()">Déconnexion</button>
+
+<nav>
+<button onclick="showSection('feed')">Accueil</button>
+<button onclick="showSection('chat')">Chat</button>
+<button onclick="showSection('profile')">Profil</button>
+</nav>
+
+<div id="feedSection">
+
+<h3>Nouvelle publication</h3>
+<textarea id="postText" placeholder="Écrire message..."></textarea>
+<input type="file" id="postImage">
+<button class="primary" onclick="addPost()">Publier</button>
+
+<div id="posts"></div>
+
+</div>
+
+<div id="chatSection" class="hidden">
+<h3>Chat général</h3>
+<div id="chatBox"></div>
+<input type="text" id="chatInput" placeholder="Message...">
+<button class="primary" onclick="sendMessage()">Envoyer</button>
+</div>
+
+<div id="profileSection" class="hidden">
+<h3>Mon Profil</h3>
+<div id="profileInfo"></div>
+</div>
+
+</div>
+</div>
+
+<script>
+const SECRET_CODE = "LOCATAIRE2026";
+let currentUser = localStorage.getItem("currentUser");
+
+if(currentUser) initApp();
+
+function register(){
+    let user = regUser.value;
+    let pass = regPass.value;
+    let code = regCode.value;
+    let photoFile = regPhoto.files[0];
+
+    if(code !== SECRET_CODE){
+        alert("Code secret incorrect");
+        return;
+    }
+
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+    if(users.find(u=>u.user===user)){
+        alert("Utilisateur existe déjà");
+        return;
+    }
+
+    let reader = new FileReader();
+    reader.onload = function(){
+        users.push({
+            user:user,
+            pass:pass,
+            photo:reader.result,
+            role: users.length===0 ? "admin":"member"
+        });
+        localStorage.setItem("users",JSON.stringify(users));
+        alert("Inscription réussie !");
+    }
+    if(photoFile){
+        reader.readAsDataURL(photoFile);
+    }else{
+        users.push({user,pass,photo:"",role:"member"});
+        localStorage.setItem("users",JSON.stringify(users));
+        alert("Inscription réussie !");
+    }
+}
+
+function login(){
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+    let found = users.find(u=>u.user===logUser.value && u.pass===logPass.value);
+    if(found){
+        localStorage.setItem("currentUser",found.user);
+        initApp();
+    }else{
+        alert("Erreur connexion");
+    }
+}
+
+function logout(){
+    localStorage.removeItem("currentUser");
+    location.reload();
+}
+
+function initApp(){
+    auth.classList.add("hidden");
+    app.classList.remove("hidden");
+    loadPosts();
+    loadChat();
+    loadProfile();
+}
+
+function showSection(sec){
+    feedSection.classList.add("hidden");
+    chatSection.classList.add("hidden");
+    profileSection.classList.add("hidden");
+
+    if(sec==="feed") feedSection.classList.remove("hidden");
+    if(sec==="chat") chatSection.classList.remove("hidden");
+    if(sec==="profile") profileSection.classList.remove("hidden");
+}
+
+function addPost(){
+    let text = postText.value;
+    let imageFile = postImage.files[0];
+    if(!text && !imageFile) return;
+
+    let posts = JSON.parse(localStorage.getItem("posts")) || [];
+    let reader = new FileReader();
+
+    reader.onload = function(){
+        posts.unshift({
+            user:currentUser,
+            text:text,
+            image:reader.result || "",
+            date:new Date().toLocaleString()
+        });
+        localStorage.setItem("posts",JSON.stringify(posts));
+        postText.value="";
+        postImage.value="";
+        loadPosts();
+    }
+
+    if(imageFile){
+        reader.readAsDataURL(imageFile);
+    }else{
+        posts.unshift({
+            user:currentUser,
+            text:text,
+            image:"",
+            date:new Date().toLocaleString()
+        });
+        localStorage.setItem("posts",JSON.stringify(posts));
+        postText.value="";
+        loadPosts();
+    }
+}
+
+function loadPosts(){
+    let posts = JSON.parse(localStorage.getItem("posts")) || [];
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+    postsDiv.innerHTML="";
+
+    posts.forEach((p,i)=>{
+        let u = users.find(us=>us.user===p.user);
+        postsDiv.innerHTML+=`
+        <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;">
+        <img src="${u?.photo||''}" class="profile-pic">
+        <b>${p.user}</b>
+        </div>
+        <small>${p.date}</small>
+        <p>${p.text}</p>
+        ${p.image? `<img src="${p.image}" style="width:100%;border-radius:8px;">`:""}
+        ${p.user===currentUser? `<button class="danger" onclick="deletePost(${i})">Supprimer</button>`:""}
+        </div>
+        `;
+    });
+}
+
+function deletePost(i){
+    let posts = JSON.parse(localStorage.getItem("posts")) || [];
+    posts.splice(i,1);
+    localStorage.setItem("posts",JSON.stringify(posts));
+    loadPosts();
+}
+
+function sendMessage(){
+    let msg = chatInput.value;
+    if(!msg) return;
+
+    let chat = JSON.parse(localStorage.getItem("chat")) || [];
+    chat.push({user:currentUser,msg:msg});
+    localStorage.setItem("chat",JSON.stringify(chat));
+    chatInput.value="";
+    loadChat();
+}
+
+function loadChat(){
+    let chat = JSON.parse(localStorage.getItem("chat")) || [];
+    chatBox.innerHTML="";
+    chat.forEach(c=>{
+        chatBox.innerHTML+=`
+        <div class="card">
+        <b>${c.user}</b>: ${c.msg}
+        </div>`;
+    });
+}
+
+function loadProfile(){
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+    let u = users.find(us=>us.user===currentUser);
+    profileInfo.innerHTML=`
+    <img src="${u.photo||''}" style="width:80px;height:80px;border-radius:50%;">
+    <p><b>Nom:</b> ${u.user}</p>
+    <p><b>Rôle:</b> ${u.role}</p>
+    `;
+}
+</script>
+
+</body>
+</html>
